@@ -41,6 +41,7 @@ type Torrent struct {
 	PubDate     string      `json:"pubdate"`
 	Category    string      `json:"category"`
 	Ranked      int         `json:"ranked"`
+	MagnetURL   string      `json:"download"`
 	EpisodeInfo EpisodeInfo `json:"episode_info"`
 }
 
