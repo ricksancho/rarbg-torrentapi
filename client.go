@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kr/pretty"
 	"gopkg.in/bsm/ratelimit.v1"
 	"io/ioutil"
 	"net/http"
@@ -88,10 +87,11 @@ type Client struct {
 	HTTPClient *http.Client
 	Token      string
 	rl         *ratelimit.RateLimiter
+	AppId      int
 }
 
 // New creates a new client
-func New() (*Client, error) {
+func New(AppId int) (*Client, error) {
 	endPoint, err := url.Parse(DefaultEndpoint)
 	if err != nil {
 		return nil, err
@@ -101,6 +101,7 @@ func New() (*Client, error) {
 		Endpoint:   endPoint,
 		HTTPClient: http.DefaultClient,
 		rl:         rl,
+		AppId:      AppId,
 	}
 	return c, nil
 }
@@ -109,17 +110,19 @@ func (c *Client) Init() error {
 	return c.GetToken()
 }
 
-func (c *Client) List(query map[string]string) error {
+func (c *Client) List(query map[string]string) (r TorrentResults, err error) {
 	query["mode"] = "list"
+
 	return c.Search(query)
 }
 
-func (c *Client) Search(query map[string]string) error {
+func (c *Client) Search(query map[string]string) (r TorrentResults, err error) {
 	var baseUrl url.URL
 	baseUrl = *c.Endpoint // Copy the URL struct into a local one
 
 	params := url.Values{}
 	params.Add("token", c.Token)
+	params.Add("app_id", fmt.Sprintf("%d", c.AppId))
 
 	if _, ok := query["mode"]; !ok {
 		params.Add("mode", "search")
@@ -134,53 +137,66 @@ func (c *Client) Search(query map[string]string) error {
 	baseUrl.RawQuery = params.Encode()
 
 	if c.rl.Limit() {
-		return ErrApiRate
+		err = ErrApiRate
+		return
 	}
-	resp, err := c.HTTPClient.Get(baseUrl.String())
+
+	var resp *http.Response
+	resp, err = c.HTTPClient.Get(baseUrl.String())
+	if resp.StatusCode == 429 {
+		err = ErrApiRate
+		return
+	}
+
+	fmt.Println(resp.StatusCode)
 	if err != nil {
-		return err
+		return
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
+
+	fmt.Println(string(b))
 	if err != nil {
-		return err
+		return
 	}
-	r := TorrentResults{}
+
 	err = json.Unmarshal(b, &r)
 	if err != nil {
-		return err
+		return
 	}
 	if r.Code != 0 {
-		fmt.Println(r.ApiError.Error())
-		return r.ApiError.Convert()
+		err = r.ApiError.Convert()
+		return
 	}
-	pretty.Println(r)
-	return nil
+
+	return
 }
 
-func (c *Client) GetToken() error {
+func (c *Client) GetToken() (err error) {
 	var baseUrl url.URL
 	baseUrl = *c.Endpoint // Copy the URL struct into a local one
 
 	params := url.Values{}
+	params.Add("app_id", fmt.Sprintf("%d", c.AppId))
 	params.Add("get_token", "get_token")
 	baseUrl.RawQuery = params.Encode()
 
-	resp, err := c.HTTPClient.Get(baseUrl.String())
+	var resp *http.Response
+	resp, err = c.HTTPClient.Get(baseUrl.String())
 	if err != nil {
-		return err
+		return
 	}
 	defer resp.Body.Close()
+
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return
 	}
 
 	r := struct {
 		Token string `json:"token"`
 		ApiError
 	}{}
-
 	err = json.Unmarshal(b, &r)
 	if err != nil {
 		return err
