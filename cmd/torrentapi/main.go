@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	t, err := torrentapi.New()
+	t, err := torrentapi.New(1337)
 	if err != nil {
 		panic(err)
 	}
@@ -16,25 +16,18 @@ func main() {
 		panic(err)
 	}
 
-	err = t.List(map[string]string{"category": "movies", "sort": "seeders"})
+	var results torrentapi.TorrentResults
+	results, err = t.List(map[string]string{"category": "movies", "sort": "seeders"})
 	if err != nil {
-		fmt.Println(err)
+		panic(err)
 	}
+	fmt.Println(len(results.Torrents))
 	time.Sleep(time.Duration(2) * time.Second)
 
-	for i := 0; i < 2; i++ {
-		err = t.Search(map[string]string{
-			"search_string": "Shaun of the dead",
-			"sort":          "seeders"})
-		/*err = t.Search(map[string]string{
-		"search_imdb": "tt1979388",
-		"sort":        "seeders"})*/
-		/*err = t.Search(map[string]string{
-		"search_imdb":   "tt4016454",
-		"search_string": "S01E10", "sort": "seeders"})*/
-		if err != nil {
-			fmt.Println(err)
-		}
+	results, err = t.Search(map[string]string {"search_string": "Westworld season 1", "sort": "seeders"})
+	if err != nil {
+		panic(err)
 	}
 
+	fmt.Println(len(results.Torrents))
 }
