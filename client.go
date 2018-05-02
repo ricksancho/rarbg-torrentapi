@@ -148,14 +148,12 @@ func (c *Client) Search(query map[string]string) (r TorrentResults, err error) {
 		return
 	}
 
-	fmt.Println(resp.StatusCode)
 	if err != nil {
 		return
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 
-	fmt.Println(string(b))
 	if err != nil {
 		return
 	}
